@@ -17,7 +17,7 @@ korge {
 
 	targetJvm()
 	//targetJs()
-	//targetDesktop()
+	targetDesktop()
 	//targetIos()
 	//targetAndroidIndirect() // targetAndroidDirect()
 }

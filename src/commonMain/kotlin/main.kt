@@ -96,13 +96,9 @@ private fun drawScene(
     width: Int,
     height: Int,
     colors: List<RGBA>,
-    shapeBuilder: ShapeBuilder
+    graphics: Graphics
 ) {
-    with (shapeBuilder) {
-        fill(Colors.BLACK) {
-            rect(0, 0, width, height)
-        }
-    }
+    val wallsList: MutableList<Pair<Int, RGBA>> = mutableListOf()
     for (x in 0 until width) {
         val cameraMultiplier = 2.0 * x / width - 1.0
         val ray = player.direction + player.camera * cameraMultiplier
@@ -160,17 +156,25 @@ private fun drawScene(
                 .withG(tempColor.g / 2)
                 .withB(tempColor.b / 2)
         }
-        with(shapeBuilder) {
+        wallsList.add(wallHeight.toInt() to color)
+    }
+    graphics.updateShape {
+        fill(Colors.BLACK) {
+            rect(0, 0, width, height)
+        }
+        for ((x, wall) in wallsList.withIndex()) {
+            val (wallHeight, color) = wall
             fill(color) {
                 rect(
                     x = x,
-                    y = max(height / 2 - wallHeight.toInt() / 2, 0),
+                    y = max(height / 2 - wallHeight / 2, 0),
                     width = 1,
-                    height = wallHeight.toInt()
+                    height = wallHeight
                 )
             }
         }
     }
+    graphics.redrawIfRequired()
 }
 
 
@@ -221,7 +225,10 @@ private val colors = listOf(
 )
 
 suspend fun main() = Korge(width = WIDTH, height = HEIGHT, bgcolor = Colors.BLACK) {
-    addUpdater {timeSpan ->
+    val gr = graphics {
+        this@Korge.position(0, 0)
+    }
+    this@Korge.addUpdater {timeSpan ->
         val playerAction = when {
             input.keys[Key.UP] -> PlayerAction.MoveForward
             input.keys[Key.DOWN] -> PlayerAction.MoveBackwards
@@ -230,16 +237,13 @@ suspend fun main() = Korge(width = WIDTH, height = HEIGHT, bgcolor = Colors.BLAC
             else -> null
         }
         player.update(timeSpan.seconds, playerAction, grid)
-        graphics {
-            this@Korge.position(0, 0)
-            drawScene(
-                player,
-                grid,
-                WIDTH,
-                HEIGHT,
-                colors,
-                this
-            )
-        }
+        drawScene(
+            player,
+            grid,
+            WIDTH,
+            HEIGHT,
+            colors,
+            gr
+        )
     }
 }
