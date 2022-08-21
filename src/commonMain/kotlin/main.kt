@@ -1,5 +1,6 @@
 import com.soywiz.kds.*
 import com.soywiz.kmem.*
+import com.soywiz.korev.*
 import com.soywiz.korge.*
 import com.soywiz.korge.scene.*
 import com.soywiz.korge.view.*
@@ -17,11 +18,77 @@ private enum class Side {
     Horizontal
 }
 
+enum class PlayerAction {
+    MoveForward,
+    MoveBackwards,
+    RotateLeft,
+    RotateRight
+}
+
 data class Player(
     val position: Point,
     val direction: Point,
-    val camera: Point
-)
+    val camera: Point,
+    val moveSpeed: Double = MOVE_SPEED,
+    val rotateSpeed: Double = ROTATE_SPEED
+) {
+    companion object {
+        private const val MOVE_SPEED = 5.0
+        private const val ROTATE_SPEED = 8.0
+    }
+
+    fun update(dt: Double, action: PlayerAction?, grid: Grid) {
+        when (action) {
+            PlayerAction.MoveForward -> {
+                val actualMoveSpeed = moveSpeed * dt
+                val updatedPlayerPosition = position + direction * actualMoveSpeed
+                if (updatedPlayerPosition.x.toInt() in 0 until grid.width) {
+                    if (grid[position.y.toInt(), updatedPlayerPosition.x.toInt()] == 0) {
+                        position.x = updatedPlayerPosition.x
+                    }
+                }
+                if (updatedPlayerPosition.y.toInt() in 0 until grid.height) {
+                    if (grid[updatedPlayerPosition.y.toInt(), position.x.toInt()] == 0) {
+                        position.y = updatedPlayerPosition.y
+                    }
+                }
+            }
+            PlayerAction.MoveBackwards -> {
+                val actualMoveSpeed = moveSpeed * dt
+                val updatedPlayerPosition = position - direction * actualMoveSpeed
+                if (updatedPlayerPosition.x.toInt() in 0 until grid.width) {
+                    if (grid[position.y.toInt(), updatedPlayerPosition.x.toInt()] == 0) {
+                        position.x = updatedPlayerPosition.x
+                    }
+                }
+                if (updatedPlayerPosition.y.toInt() in 0 until grid.height) {
+                    if (grid[updatedPlayerPosition.y.toInt(), position.x.toInt()] == 0) {
+                        position.y = updatedPlayerPosition.y
+                    }
+                }
+            }
+            PlayerAction.RotateLeft -> {
+                val actualRotationSpeed = rotateSpeed * dt
+                val updatedDirection = direction.rotate(actualRotationSpeed.degrees)
+                direction.x = updatedDirection.x
+                direction.y = updatedDirection.y
+                val updatedCamera = camera.rotate(actualRotationSpeed.degrees)
+                camera.x = updatedCamera.x
+                camera.y = updatedCamera.y
+            }
+            PlayerAction.RotateRight -> {
+                val actualRotationSpeed = rotateSpeed * dt
+                val updatedDirection = direction.rotate(-actualRotationSpeed.degrees)
+                direction.x = updatedDirection.x
+                direction.y = updatedDirection.y
+                val updatedCamera = camera.rotate(-actualRotationSpeed.degrees)
+                camera.x = updatedCamera.x
+                camera.y = updatedCamera.y
+            }
+            null -> {}
+        }
+    }
+}
 
 private fun drawScene(
     player: Player,
@@ -31,6 +98,11 @@ private fun drawScene(
     colors: List<RGBA>,
     shapeBuilder: ShapeBuilder
 ) {
+    with (shapeBuilder) {
+        fill(Colors.BLACK) {
+            rect(0, 0, width, height)
+        }
+    }
     for (x in 0 until width) {
         val cameraMultiplier = 2.0 * x / width - 1.0
         val ray = player.direction + player.camera * cameraMultiplier
@@ -59,9 +131,6 @@ private fun drawScene(
         val mapPoint = PointInt(x = player.position.x.toIntCeil(), y = player.position.y.toIntCeil())
         var side = Side.Vertical
         var isHit = false
-        if (x == 25) {
-            print(x)
-        }
         while (!isHit) {
             if (sideStep.x < sideStep.y) {
                 sideStep.x += deltaDistance.x
@@ -152,15 +221,25 @@ private val colors = listOf(
 )
 
 suspend fun main() = Korge(width = WIDTH, height = HEIGHT, bgcolor = Colors.BLACK) {
-    graphics {
-        this@Korge.position(0, 0)
-        drawScene(
-            player,
-            grid,
-            WIDTH,
-            HEIGHT,
-            colors,
-            this
-        )
+    addUpdater {timeSpan ->
+        val playerAction = when {
+            input.keys[Key.UP] -> PlayerAction.MoveForward
+            input.keys[Key.DOWN] -> PlayerAction.MoveBackwards
+            input.keys[Key.LEFT] -> PlayerAction.RotateLeft
+            input.keys[Key.RIGHT] -> PlayerAction.RotateRight
+            else -> null
+        }
+        player.update(timeSpan.seconds, playerAction, grid)
+        graphics {
+            this@Korge.position(0, 0)
+            drawScene(
+                player,
+                grid,
+                WIDTH,
+                HEIGHT,
+                colors,
+                this
+            )
+        }
     }
 }
